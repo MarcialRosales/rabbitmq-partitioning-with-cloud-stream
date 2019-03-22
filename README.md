@@ -1,7 +1,5 @@
 # Data Partitioning with Spring Cloud Stream over RabbitMQ
 
-**Table of Content**
-
 - [Introduction](#introduction)
   - [Goal of this guide](#goal-of-this-guide)
   - [Why do we do need to partition the data?](#why-do-we-do-need-to-partition-the-data)
@@ -26,7 +24,7 @@ The goal is to explore what it takes to use [Spring Cloud Stream](https://docs.s
 
 ## Why do we do need to partition the data?
 
-There could be various reasons:
+There could be various reasons. Here are two:
 - We need strictly ordered processing of messages but we cannot afford to have a single consumer. For this reason, we partition the messages based on the business criteria that imposes the ordering. For instance, we should process, in order, all the messages for a given account. It does not matter the order of messages between accounts.
 - We need to increase the message throughput or reduce message latency. For that matter, we want messages to reside in multiple queues rather than just one queue. RabbitMQ uses an Erlang process per queue, this means processing messages for a queue is single threaded.
 
@@ -150,9 +148,9 @@ spring:
                 password: guest
                 virtual-host: /
 ```
-> Extracted from [trade-executor/src/main/resources/application.yml](trade-requestor/src/main/resources/application.yml)
+> Extracted from [trade-requestor/src/main/resources/application.yml](trade-requestor/src/main/resources/application.yml)
 
-A *Binding* is the mapping of a channel to a destination in a configured *binder*. Below we see the *bindings* for the *Output* channel `tradesEmitter` ([MessagingBridge.tradesEmitter()](trade-executor/src/main/java/com/pivotal/partitioning/MessagingBridge.java#L10)) which is mapped to the `local_rabbit` *binder* we declared above.
+A *Binding* is the mapping of a channel to a destination in a configured *binder*. Below we see the *bindings* for the *Output* channel `tradesEmitter` ([MessagingBridge.tradesEmitter()](trade-requestor/src/main/java/com/pivotal/partitioning/MessagingBridge.java#L10)) which is mapped to the `local_rabbit` *binder* we declared above.
 ```yaml
 spring:
   cloud:
@@ -167,7 +165,7 @@ spring:
             partitionSelectorName: partitionSelectorStrategy  
 
 ```
-> Also extracted from [trade-executor/src/main/resources/application.yml](trade-requestor/src/main/resources/application.yml)
+> Also extracted from [trade-requestor/src/main/resources/application.yml](trade-requestor/src/main/resources/application.yml)
 
 ## Deep-dive on How Channels are bound to RabbitMQ Resources
 
@@ -238,16 +236,12 @@ In the next two sections we discuss in greater detail what it takes to configure
 
 ## Configuring Producers
 We need to tell producers which is the partition key to used. A domain event usually has a partition key so that
-it ends up in the same partition with related messages. This can be configured using two properties:
+it ends up in the same partition with related messages. This can be configured into ways:
 
-`spring.cloud.stream.bindings.<channel_name>.producer.partitionKeyExpression` — the expression to partition the payloads.
-It is a SpEL expression that is evaluated against the outbound message for extracting the partitioning key.
-or
-`spring.cloud.stream.bindings.<channel_name>.producer.partitionKeyExtractorName` if we want to use a custom logic to determine the partition key.
-The value is the @Bean's name which implements `org.springframework.cloud.stream.binder.PartitionKeyExtractorStrategy`.
-and
-`spring.cloud.stream.bindings.<channel_name>.producer.partitionCount` — Once we have determined the partition key, the partition selection
-process determines the target partition based on a value between 0 and `partitionCount`- 1. This value is obtained using the formula:
+- One way is to define an SpEL expression that when evaluated against the outgoing message it returns the value to partition. This expression is configured in the property  `spring.cloud.stream.bindings.<channel_name>.producer.partitionKeyExpression`
+- Another way is to define our own custom logic and create an instance of that logic and expose it as a @Bean. We set the name of the @bean in `spring.cloud.stream.bindings.<channel_name>.producer.partitionKeyExtractorName`
+
+We saw earlier that the key property we need to configure is `spring.cloud.stream.bindings.<channel_name>.producer.partitionCount`. The partition number must be between 0 and `partitionCount`- 1. This value is obtained using the formula:
  `key.hashCode() % partitionCount`. However, we can provide our own formula implementing `org.springframework.cloud.stream.binder.PartitionSelectorStrategy`
  similar to how we did it for partition key selection. And specify the @Bean name via the property `partitionSelectorName`.
 
