@@ -1,0 +1,26 @@
+management.endpoints.web.exposure.include: bindings,metrics
+spring:
+  cloud:
+    stream:
+      bindings:
+        trades:  # com.pivotal.partitioning.TRADES
+          destination: q_trades
+          binder: local_rabbit
+          group: trades_group
+          consumer:
+            concurrency: 2
+        tradeConfirmations:  # com.pivotal.partitioning.TRADE_CONFIRMATION
+          destination: q_trade_confirmations
+          binder: local_rabbit
+
+      binders:
+        local_rabbit:
+          type: rabbit
+          environment:
+            spring:
+              rabbitmq:
+                host: localhost
+                port: 5672
+                username: guest
+                password: guest
+                virtual-host: /
