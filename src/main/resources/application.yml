@@ -1,14 +1,26 @@
 management.endpoints.web.exposure.include: bindings,metrics
+
+
 spring:
   cloud:
     stream:
+
       bindings:
+        tradesEmitter:
+          destination: trades
+          binder: local_rabbit
+
         trades:  # com.pivotal.partitioning.TRADES
-          destination: q_trades
+          destination: trades
           binder: local_rabbit
           group: trades_group
+
         tradeConfirmations:  # com.pivotal.partitioning.TRADE_CONFIRMATION
-          destination: q_trade_confirmations
+          destination: trade_confirmations
+          binder: local_rabbit
+
+        tradeConfirmationEmitter:
+          destination: trade_confirmations
           binder: local_rabbit
 
       binders:
