@@ -2,21 +2,21 @@
 
 **Table of Content**
 
-1. Introduction
-  1.1. [Goal of this guide]()
-  1.2. [Why do we do need to partition the data?]()
-  1.3. [Why do we need to use Spring Cloud Stream?]()
-2. Getting started
-  2.1. [Brief introduction to Spring Cloud Stream]()
-  2.2. [How Channels are bound to RabbitMQ Resources]()
-  2.3. [Deep-dive on How Channels are bound to RabbitMQ Resources]()
-3. Data Partitioning
-  3.1. [Configuring Producers]()
-  3.2. [Configuring Producers]()
-4. Resiliency
-  4.1. [Producer resiliency]()
-  4.2. [Consumer Resiliency]()
-5. Bootstrapping RabbitMQ ConnectionFactory
+1. [Introduction](#introduction)
+  1.1. [Goal of this guide](#goal-of-this-guide)
+  1.2. [Why do we do need to partition the data?](#why-do-we-do-need-to-partition-the-data)
+  1.3. [Why do we need to use Spring Cloud Stream?](#why-do-we-need-to-use-spring-cloud-stream)
+2. [Getting started](#getting-started)
+  2.1. [Brief introduction to Spring Cloud Stream](#brief-introduction-to-spring-cloud-stream)
+  2.2. [How Channels are bound to RabbitMQ Resources](#how-channels-are-bound-to-rabbitmq-resources)
+  2.3. [Deep-dive on How Channels are bound to RabbitMQ Resources](#deep-dive-on-how-channels-are-bound-to-rabbitmq-resources)
+3. [Data Partitioning](#data-partitioning)
+  3.1. [Configuring Producers](#configuring-producers)
+  3.2. [Configuring Producers](#configuring-consumers)
+4. [Resiliency](#resiliency)
+  4.1. [Producer resiliency](#producer-resiliency)
+  4.2. [Consumer Resiliency](#consumer-resiliency)
+5. [Bootstrapping RabbitMQ ConnectionFactory](#bootstrapping-rabbitmq-connectionfactory)
 
 # Introduction
 
@@ -45,9 +45,9 @@ Prerequisites:
 - Maven +3.3
 - Docker installed unless you are running RabbitMQ elsewhere or even locally
 
-```
-git clone http://
-cd spring-stream-partitioning
+```bash
+git clone https://github.com/MarcialRosales/rabbitmq-partitioning-with-cloud-stream
+cd rabbitmq-partitioning-with-cloud-stream
 ```
 
 Under the root folder we have two Spring Boot applications:
@@ -114,7 +114,7 @@ public class TradeRequestorApplication {
 ```
 
 Once, we have the `messagingBridge` wired onto our application, as shown above, we can use it to send messages like shown below:
-```
+```Java
 public class TradeRequestorApplication {
 
   @Scheduled(fixedRate = 5000)
@@ -177,7 +177,7 @@ For each consumer group, a Queue is bound to that TopicExchange. Each consumer i
 
 We know that a channel is a *pipe* abstraction used in Spring Cloud Stream. The name of the channel is what we define in the annotation `@Sink` or `@Source`,
 for instance when we declared these
-```
+```Java
     @Input(TRADES)
     SubscribableChannel trades();
 
@@ -197,7 +197,7 @@ The exchange is named after the channel name if we did not configure a `destinat
 configuration entry. See below (extracted from `application_no_consumer_groups.yml`). The channel named `trades` has a destination called `q_trades` therefore the exchange
 will be named `q_trades` of type *Topic*.
 
-```
+```yaml
 spring:
   cloud:
     stream:
