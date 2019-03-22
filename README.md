@@ -11,6 +11,7 @@
 - [Data Partitioning](#data-partitioning)
   - [Configuring Producers](#configuring-producers)
   - [Configuring Producers](#configuring-consumers)
+  - [Scaling consumers](#Scaling-consumers)
 - [Resiliency](#resiliency)
   - [Producer resiliency](#producer-resiliency)
   - [Consumer Resiliency](#consumer-resiliency)
@@ -24,9 +25,10 @@ The goal is to explore what it takes to use [Spring Cloud Stream](https://docs.s
 
 ## Why do we do need to partition the data?
 
-There could be various reasons. Here are two:
-- We need strictly ordered processing of messages but we cannot afford to have a single consumer. For this reason, we partition the messages based on the business criteria that imposes the ordering. For instance, we should process, in order, all the messages for a given account. It does not matter the order of messages between accounts.
-- We need to increase the message throughput or reduce message latency. For that matter, we want messages to reside in multiple queues rather than just one queue. RabbitMQ uses an Erlang process per queue, this means processing messages for a queue is single threaded.
+There could be various reasons. Here are threes:
+- **Ordered processing** - We need strictly ordered processing of messages but we cannot afford to have a single consumer. For this reason, we partition the messages based on the business criteria that imposes the ordering. For instance, we should process, in order, all the messages for a given account. It does not matter the order of messages between accounts.
+- **Data Consistency** - In a time-windowed average calculation example, it is important that all measurements from any given sensor are processed by the same application instance.
+- **Performance** - We need to increase the message throughput or reduce message latency. For that matter, we want messages to reside in multiple queues rather than just one queue. RabbitMQ uses an Erlang process per queue, this means processing messages for a queue is single threaded.
 
 ## Why do we need to use Spring Cloud Stream?
 
@@ -235,6 +237,7 @@ Key configuration:
 In the next two sections we discuss in greater detail what it takes to configure producers and consumers although the key configuration is what we just said above.
 
 ## Configuring Producers
+
 We need to tell producers which is the partition key to used. A domain event usually has a partition key so that
 it ends up in the same partition with related messages. This can be configured into ways:
 
@@ -246,9 +249,19 @@ We saw earlier that the key property we need to configure is `spring.cloud.strea
  similar to how we did it for partition key selection. And specify the @Bean name via the property `partitionSelectorName`.
 
 ## Configuring Consumers
+
 We need to tell the consumer that it would be consuming from a partition.
 `spring.cloud.stream.bindings.<channel_name>.consumer.partitioned: true`
 
+## Scaling consumers
+
+We can run as many instances of the **trade executor** application as needed provided they are configured with an instance identifier which is between 0 and `partitionCount - 1`. Where the `partitionCount` is defined in the **trade executor** application.
+
+If we launched a **trade executor** with a instance id of `3` where there are only 2 partitions, that instance will be reading from a partition queue which will never get any messages.
+
+**TL;DR** Once we have partition queues with data we cannot change the number of partitions and/or how partition strategy because we could end up with a data for partition in more than one partition queue.
+
+**Deploying applications to Cloud Foundry**: TODO check if Spring Cloud Stream uses [CF_INSTANCE_INDEX](https://docs.cloudfoundry.org/devguide/deploy-apps/environment-variable.html#CF-INSTANCE-INDEX) to configure `spring.cloud.stream.instanceIndex` property. If it does then we need to override it unless we either do not use auto-scaling feature or never deploy more instances than partitions.
 
 # Resiliency
 
@@ -272,3 +285,5 @@ If retry is enabled (maxAttempts > 1), failed messages are delivered to the DLQ 
 Credentials coming from Cloud Connectors will be preferred over credentials coming over local spring configuration (.ak.a. auto-configuration).
 This can be changed with this setting `spring.cloud.stream.overrideCloudConnectors`
 More details here https://docs.spring.io/spring-cloud-stream/docs/current/reference/htmlsingle/#_binding_service_properties
+
+TODO expand applications so that they get the credentials from VCAP_SERVICES and deploy them in Cloud Foundry
