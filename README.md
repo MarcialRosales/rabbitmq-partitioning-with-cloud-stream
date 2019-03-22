@@ -255,7 +255,7 @@ We need to tell the consumer that it would be consuming from a partition.
 
 ## Scaling consumers
 
-We can run as many instances of the **trade executor** application as needed provided they are configured with an instance identifier which is between 0 and `partitionCount - 1`. Where the `partitionCount` is defined in the **trade executor** application.
+We can run as many instances of the **trade executor** application as needed provided they are configured with an instance identifier which is between 0 and `partitionCount - 1`. Where the `partitionCount` is defined in the [**trade requestor** application](trade-requestor/src/main/resources/application.yml#L10).
 
 If we launched a **trade executor** with a instance id of `3` where there are only 2 partitions, that instance will be reading from a partition queue which will never get any messages.
 
