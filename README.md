@@ -257,9 +257,9 @@ We need to tell the consumer that it would be consuming from a partition.
 
 We can run as many instances of the **trade executor** application as needed provided they are configured with an instance identifier which is between 0 and `partitionCount - 1`. Where the `partitionCount` is defined in the [**trade requestor** application](trade-requestor/src/main/resources/application.yml#L10).
 
-If we launched a **trade executor** with a instance id of `3` where there are only 2 partitions, that instance will be reading from a partition queue which will never get any messages.
+If we launched a **trade executor** with a instance id of `2` where there are only 2 partitions, that instance will be reading from a partition queue (`trades.trades_group-2`) which will never get any messages.
 
-**TL;DR** Once we have partition queues with data we cannot change the number of partitions and/or how partition strategy because we could end up with a data for partition in more than one partition queue.
+**TL;DR** Once we have partition queues with data we cannot change the number of partitions and/or the partition strategy because we could end up with a partition key in more than one partition queue.
 
 **Deploying applications to Cloud Foundry**: TODO check if Spring Cloud Stream uses [CF_INSTANCE_INDEX](https://docs.cloudfoundry.org/devguide/deploy-apps/environment-variable.html#CF-INSTANCE-INDEX) to configure `spring.cloud.stream.instanceIndex` property. If it does then we need to override it unless we either do not use auto-scaling feature or never deploy more instances than partitions.
 
