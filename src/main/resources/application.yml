@@ -7,8 +7,6 @@ spring:
           destination: q_trades
           binder: local_rabbit
           group: trades_group
-          consumer:
-            concurrency: 2
         tradeConfirmations:  # com.pivotal.partitioning.TRADE_CONFIRMATION
           destination: q_trade_confirmations
           binder: local_rabbit
