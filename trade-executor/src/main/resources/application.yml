@@ -1,27 +1,16 @@
-management.endpoints.web.exposure.include: bindings,metrics
-
 
 spring:
   cloud:
     stream:
+      instance-count: 2   # there are 2 instances -> there are 2 partitions
 
       bindings:
-        tradesEmitter:
-          destination: trades
-          binder: local_rabbit
-
         trades:  # com.pivotal.partitioning.TRADES
           destination: trades
           binder: local_rabbit
           group: trades_group
-
-        tradeConfirmations:  # com.pivotal.partitioning.TRADE_CONFIRMATION
-          destination: trade_confirmations
-          binder: local_rabbit
-
-        tradeConfirmationEmitter:
-          destination: trade_confirmations
-          binder: local_rabbit
+          consumer:
+            partitioned: true
 
       binders:
         local_rabbit:

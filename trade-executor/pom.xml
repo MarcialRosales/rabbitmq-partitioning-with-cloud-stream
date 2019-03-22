@@ -9,9 +9,9 @@
 		<relativePath/> <!-- lookup parent from repository -->
 	</parent>
 	<groupId>com.pivotal.partitioning</groupId>
-	<artifactId>spring-stream-partitioning</artifactId>
+	<artifactId>trade-executor</artifactId>
 	<version>0.0.1-SNAPSHOT</version>
-	<name>spring-stream-partitioning</name>
+	<name>trade-executor</name>
 	<description>Demo project for Spring Boot</description>
 
 	<properties>
@@ -28,6 +28,7 @@
 			<groupId>org.springframework.cloud</groupId>
 			<artifactId>spring-cloud-starter-stream-rabbit</artifactId>
 		</dependency>
+		<!--
 		<dependency>
 			<groupId>org.springframework.boot</groupId>
 			<artifactId>spring-boot-starter-web</artifactId>
@@ -36,6 +37,7 @@
 			<groupId>org.springframework.boot</groupId>
 			<artifactId>spring-boot-starter-actuator</artifactId>
 		</dependency>
+		-->
 		<dependency>
 			<groupId>org.springframework.boot</groupId>
 			<artifactId>spring-boot-starter-test</artifactId>

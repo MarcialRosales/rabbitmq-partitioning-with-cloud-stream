@@ -1,0 +1,24 @@
+
+spring:
+  cloud:
+    stream:
+      bindings:
+        tradesEmitter:
+          destination: trades
+          binder: local_rabbit
+          producer:
+            partitionCount: 2
+            partitionKeyExpression: headers['account']
+            partitionSelectorName: partitionSelectorStrategy  # not required because it is the only partitionStrategy bean
+
+      binders:
+        local_rabbit:
+          type: rabbit
+          environment:
+            spring:
+              rabbitmq:
+                host: localhost
+                port: 5672
+                username: guest
+                password: guest
+                virtual-host: /

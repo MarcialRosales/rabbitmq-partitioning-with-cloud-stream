@@ -8,19 +8,12 @@ import org.springframework.messaging.SubscribableChannel;
 
 public interface MessagingBridge {
 
-    String TRADES = "trades";
-    String TRADE_CONFIRMATION = "tradeConfirmations";
-
-    @Input(TRADES)
-    SubscribableChannel trades();
-
     @Output
     MessageChannel tradesEmitter();
 
+    String TRADE_CONFIRMATION = "tradeConfirmations";
+
     @Input(TRADE_CONFIRMATION)
     SubscribableChannel tradeConfirmations();
-
-    @Output
-    MessageChannel tradeConfirmationEmitter();
 
 }
