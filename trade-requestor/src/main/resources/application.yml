@@ -1,4 +1,11 @@
 
+management:
+  endpoint:
+    health.show-details: always
+  endpoints.web.exposure.include: metrics, health, configprops, env, integrationgraph
+
+
+
 spring:
   cloud:
     stream:
@@ -8,6 +15,7 @@ spring:
           binder: local_rabbit
           producer:
             partitionCount: 2
+            requiredGroups: trades_group
             partitionKeyExpression: headers['account']
             partitionSelectorName: partitionSelectorStrategy  # not required because it is the only partitionStrategy bean
 

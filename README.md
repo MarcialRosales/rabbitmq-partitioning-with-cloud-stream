@@ -111,6 +111,18 @@ java -jar target/trade-executor-0.0.1-SNAPSHOT.jar --spring.cloud.stream.instanc
 
 This topology guarantees ordered processing of messages because we only have one **Trade Executor** instance per partition. We can have more instances provided that their `spring.cloud.stream.instanceIndex` is between `0` and `1` (i.e. partitionCount = 2).
 
+## Running sample code as if it were running in Cloud Foundry
+
+Both applications have 2 dependencies that allows them to read the credentials from `VCAP_SERVICES` if the spring profile `cloud` is enabled. Each application has a `run.sh` script launches the app configured like it were running in Cloud Foundry.
+
+**TL;DR** So that we can know if the application is reading credentials from `application.yml` or from `VCAP_SERVICES`, we need to add a user to RabbitMQ server with the credentials `bob:bob`.  `VCAP_CREDENTIALS` uses `bob:bob` whereas `application.yml` uses `guest:guest`.
+
+Here is how we launch **Trade Executor** locally like if it were running in Cloud Foundry.
+```bash
+cd trade-executor
+./run.sh
+```
+
 
 ## Brief introduction to Spring Cloud Stream
 
@@ -194,11 +206,13 @@ spring:
           binder: local_rabbit
           producer:
             partitionCount: 2
+            requiredGroups: trades_group
             partitionKeyExpression: headers['account']
             partitionSelectorName: partitionSelectorStrategy  
 
 ```
 > Also extracted from [trade-requestor/src/main/resources/application.yml](trade-requestor/src/main/resources/application.yml)
+
 
 ## Deep-dive on How Channels are bound to RabbitMQ Resources
 
@@ -257,6 +271,8 @@ exchange `q_trades` with that routing key.
 
 All this information is available via the actuator endpoint: `curl localhost:8080/actuator/bindings | jq .`
 
+For more details about Spring Cloud Stream, specially around how to use Spring Cloud Stream to build a complex topology of interconnected consumer and producer applications check out [Spring Cloud Stream app starters](https://github.com/spring-cloud-stream-app-starters) repo.
+
 # Data Partitioning
 
 We need to configure *partitioning* in the producer and in the consumer side. And in terms of Spring cloud Stream, that means configuring the output and input *bindings*.
@@ -269,8 +285,7 @@ In the next two sections we discuss in greater detail what it takes to configure
 
 ## Configuring Producers
 
-We need to tell producers which is the partition key to used. A domain event usually has a partition key so that
-it ends up in the same partition with related messages. This can be configured into ways:
+We need to tell producers which is the partition key to use. In our particular case, the partition key is the account id the trade belongs to. This can be configured into ways:
 
 - One way is to define an SpEL expression that when evaluated against the outgoing message it returns the value to partition. This expression is configured in the property  `spring.cloud.stream.bindings.<channel_name>.producer.partitionKeyExpression`
 - Another way is to define our own custom logic and create an instance of that logic and expose it as a @Bean. We set the name of the @bean in `spring.cloud.stream.bindings.<channel_name>.producer.partitionKeyExtractorName`
@@ -278,6 +293,11 @@ it ends up in the same partition with related messages. This can be configured i
 We saw earlier that the key property we need to configure is `spring.cloud.stream.bindings.<channel_name>.producer.partitionCount`. The partition number must be between 0 and `partitionCount`- 1. This value is obtained using the formula:
  `key.hashCode() % partitionCount`. However, we can provide our own formula implementing `org.springframework.cloud.stream.binder.PartitionSelectorStrategy`
  similar to how we did it for partition key selection. And specify the @Bean name via the property `partitionSelectorName`.
+
+Another key configuration property is called `requiredGroups` whose value matches the consumer's `group` attribute. If we set this value, the producer app (**Trade Requestor**) declares as many queues as indicated by the `partitionCount` attribute. This means that we do not need to wait for the consumer (**Trade executor**) to declare them. This has 2 clear advantages:
+- There will always be a queue for the messages thus we do not lose them.
+- The consumer application (**Trade Executor**) can tell from the list of available queues how many partitions exists. For more details check out the section [Scaling consumers](#Scaling-consumers) 
+
 
 ## Configuring Consumers
 
@@ -318,3 +338,86 @@ This can be changed with this setting `spring.cloud.stream.overrideCloudConnecto
 More details here https://docs.spring.io/spring-cloud-stream/docs/current/reference/htmlsingle/#_binding_service_properties
 
 TODO expand applications so that they get the credentials from VCAP_SERVICES and deploy them in Cloud Foundry
+
+
+# Operations
+
+## Monitoring metrics
+
+We have exposed the `metrics` endpoint of the [actuator ](https://docs.spring.io/spring-boot/docs/current/reference/html/production-ready-endpoints.html). It exposes metrics for `rabbitmq ` such as number of connections and for `spring integration` which is the library used by Spring Cloud Stream to talk to RabbitMQ.
+
+```bash
+curl localhost:8080/actuator/metrics | jq .names | rabbitmq
+"rabbitmq.not_acknowledged_published",
+"rabbitmq.published",
+"rabbitmq.acknowledged",
+"rabbitmq.channels",
+"rabbitmq.connections",
+"rabbitmq.rejected",
+"rabbitmq.acknowledged_published",
+"rabbitmq.unrouted_published",
+"rabbitmq.consumed",
+"rabbitmq.failed_to_publish",
+
+curl localhost:8080/actuator/metrics | jq .names | grep integ
+  "spring.integration.channels",
+  "spring.integration.handlers",
+  "spring.integration.sources"
+
+```
+
+We have also exposed the Spring integration endpoint which shares lots of valuable insight. This is how you can reach it. We have removed the output for brevity.
+```
+curl localhost:8080/actuator/integrationgraph | jq .
+```
+
+## Monitoring health status
+
+We have also exposed the `health` endpoint (insecure for demo purposes). We can get health status for *RabbitMQ* itself and also for the `local_rabbit` *binder* we configured. Both are `UP`.
+
+```bash
+curl localhost:8080/actuator/health | jq .
+```
+```json
+{
+  "status": "UP",
+  "details": {
+    "rabbit": {
+      "status": "UP",
+      "details": {
+        "version": "3.7.12"
+      }
+    },
+    "diskSpace": {
+      "status": "UP",
+      "details": {
+        "total": 500068036608,
+        "free": 49426731008,
+        "threshold": 10485760
+      }
+    },
+    "binders": {
+      "status": "UP",
+      "details": {
+        "local_rabbit": {
+          "status": "UP",
+          "details": {
+            "binderHealthIndicator": {
+              "status": "UP",
+              "details": {
+                "version": "3.7.12"
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}
+```
+
+## Gathering runtime configuration
+
+There 2 actuator endpoints we can use to gather runtime configuration of the two applications.
+
+> I have noticed that the credentials reported via `/configprops` or `/env` endpoints are not correct when using `cloud` profile. They show the configuration that would have been used locally.
