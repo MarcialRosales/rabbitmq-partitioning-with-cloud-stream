@@ -316,16 +316,17 @@ By default, Spring Cloud Stream will use client acknowledgement (`acknowledgeMod
 We can run as many instances of the **trade executor** application as needed provided they are configured with an instance identifier which is between 0 and `partitionCount - 1`. Where the `partitionCount` is defined in the [**trade requestor** application](trade-requestor/src/main/resources/application.yml#L10).
 
 However, when we deploy the application to Cloud Foundry,
-Spring Cloud Stream uses the  [CF_INSTANCE_INDEX](https://docs.cloudfoundry.org/devguide/deploy-apps/environment-variable.html#CF-INSTANCE-INDEX) environment variable to [configure](https://github.com/spring-cloud/spring-cloud-stream/blob/master/spring-cloud-stream/src/main/java/org/springframework/cloud/stream/config/BindingServiceProperties.java#L66) `spring.cloud.stream.instanceIndex` property if we have not set it yet.
+Spring Cloud Stream uses the  [CF_INSTANCE_INDEX](https://docs.cloudfoundry.org/devguide/deploy-apps/environment-variable.html#CF-INSTANCE-INDEX) environment variable to [configure](https://github.com/spring-cloud/spring-cloud-stream/blob/master/spring-cloud-stream/src/main/java/org/springframework/cloud/stream/config/BindingServiceProperties.java#L66) `spring.cloud.stream.instanceIndex` property if we have not set it yet specially if we are using [Cloud Foundry auto-scaling](https://docs.run.pivotal.io/appsman-services/autoscaler/using-autoscaler.html) feature.  
 
-If we are using [Cloud Foundry auto-scaling](https://docs.run.pivotal.io/appsman-services/autoscaler/using-autoscaler.html) feature, we have to set/override by round-robin the instances among the partitions. This means instance 0 will go to partition 0, instance 1 to partition 1, but instance 2 will go to partition 0, and so forth.
+We have to set the `instanceIndex` variable of the `trades` binding so that it rounds robin the instances among the partitions. For example, if we have 2 partitions, instanceIndex 0 will go to partition 0, instanceIndex 1 to partition 1, but instanceIndex 2 will go to partition 0, and so forth.
 
-These is what it takes to deploy the **Trade Executor** application in Cloud Foundry:
+This is what we need to do to deploy the **Trade Executor** application to Cloud Foundry:
   - [Declare the number of partitions](trade-executor/manifest.yml#L5) in the manifest.yml that we will use to push the application to Cloud Foundry.
-  - [Set the `instanceIndex` so that it round-robins CF_INSTANCE_INDEX around the number of partitions](trade-executor/.profile) in the .profile file that we will be sent when we push the application to Cloud Foundry.  
+  - [Set the `instanceIndex` so that it round-robins CF_INSTANCE_INDEX around the number of partitions](trade-executor/.profile) in the .profile file that we will send along with the application to Cloud Foundry.  
+
   Notice that we are setting the `instanceIndex` over the `trades` binding and not the more general `spring.cloud.stream.instanceIndex`. The former is preferred over the latter because it is more specific and allows us to have multiple partitioned queues with different `instanceIndex` and `partitionCount`.
 
-There is another [manifest.yml](trade-requestor/manifest.yml) but it is not really important except that it allows us to override the number of partitions defined in the [application.yml](trade-requestor/src/main/resources/application.yml).
+The **Trade Requestor** has also its [manifest.yml](trade-requestor/manifest.yml) file but it is not really important except that it allows us to override the number of partitions defined in the [application.yml](trade-requestor/src/main/resources/application.yml).
 
 
 ### Changing partition count and/or partition selection strategy
