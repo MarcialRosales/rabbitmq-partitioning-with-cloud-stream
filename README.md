@@ -294,25 +294,60 @@ We saw earlier that the key property we need to configure is `spring.cloud.strea
  `key.hashCode() % partitionCount`. However, we can provide our own formula implementing `org.springframework.cloud.stream.binder.PartitionSelectorStrategy`
  similar to how we did it for partition key selection. And specify the @Bean name via the property `partitionSelectorName`.
 
-Another key configuration property is called `requiredGroups` whose value matches the consumer's `group` attribute. If we set this value, the producer app (**Trade Requestor**) declares as many queues as indicated by the `partitionCount` attribute. This means that we do not need to wait for the consumer (**Trade executor**) to declare them. This has 2 clear advantages:
-- There will always be a queue for the messages thus we do not lose them.
-- The consumer application (**Trade Executor**) can tell from the list of available queues how many partitions exists. For more details check out the section [Scaling consumers](#Scaling-consumers) 
+### Message delivery
 
+A key configuration attribute is called `requiredGroups` whose value matches the consumer's `group` attribute. If we set this value, the producer app (**Trade Requestor**) declares as many queues as indicated by the `partitionCount` attribute. This means that we do not need to wait for the consumer (**Trade executor**) to declare them. This has one advantages which is that there will always be a queue for the messages and therefore we do not lose them if the **Trade Executor** has not declare the queues yet. The disadvantage is that we are coupling the producer with the consumer. The consumer may want to use a different queue name.
 
 ## Configuring Consumers
 
 We need to tell the consumer that it would be consuming from a partition.
 `spring.cloud.stream.bindings.<channel_name>.consumer.partitioned: true`
 
+### Strict ordering
+
+If we need to have strict ordering of processing of messages we need to use `exclusive: true` attribute. If we have more instances, they will fail to subscribe but will retry based on the `recoveryInterval: 5000` attribute.
+
+### Message delivery
+
+By default, Spring Cloud Stream will use client acknowledgement (`acknowledgeMode: AUTO`). It will reject messages if the application failed to process and it will not requeue them. We can change this behaviour though with `requeueRejected: true`. But be careful changing this value because it could produce a storm of poisonous messages.
+
 ## Scaling consumers
 
 We can run as many instances of the **trade executor** application as needed provided they are configured with an instance identifier which is between 0 and `partitionCount - 1`. Where the `partitionCount` is defined in the [**trade requestor** application](trade-requestor/src/main/resources/application.yml#L10).
 
+However, when we deploy the application to Cloud Foundry,
+Spring Cloud Stream uses the  [CF_INSTANCE_INDEX](https://docs.cloudfoundry.org/devguide/deploy-apps/environment-variable.html#CF-INSTANCE-INDEX) environment variable to [configure](https://github.com/spring-cloud/spring-cloud-stream/blob/master/spring-cloud-stream/src/main/java/org/springframework/cloud/stream/config/BindingServiceProperties.java#L66) `spring.cloud.stream.instanceIndex` property if we have not set it yet.
+
+If we are using [Cloud Foundry auto-scaling](https://docs.run.pivotal.io/appsman-services/autoscaler/using-autoscaler.html) feature, we have to set/override it. Likewise if we are not able to control the deployed number of instances.
+
+### Adding more unique consumers
+
 If we launched a **trade executor** with a instance id of `2` where there are only 2 partitions, that instance will be reading from a partition queue (`trades.trades_group-2`) which will never get any messages.
 
-**TL;DR** Once we have partition queues with data we cannot change the number of partitions and/or the partition strategy because we could end up with a partition key in more than one partition queue.
+### Changing partition count and/or partition selection strategy
 
-**Deploying applications to Cloud Foundry**: TODO check if Spring Cloud Stream uses [CF_INSTANCE_INDEX](https://docs.cloudfoundry.org/devguide/deploy-apps/environment-variable.html#CF-INSTANCE-INDEX) to configure `spring.cloud.stream.instanceIndex` property. If it does then we need to override it unless we either do not use auto-scaling feature or never deploy more instances than partitions.
+Once we have partition queues with data we cannot change the number of partitions and/or the partition strategy because we could end up with a partition key in more than one partition queue.
+
+e.g.
+
+We start **Trade Requestor** with `partitionCount: 2`. We two **Trade Executor** with `instanceId: 0` and `instance:1` respectively. At this point, we have 2 empty queues, `trades.trades_group-0` and `trades.trade_group-1`.
+
+**Trade Requestor** sends 2 messages:
+  - one for `accountId: 2` which goes to partition `0`
+  - and another for `accountId: 3` which goes to partition `1`
+
+If we launched a third **Trade Executor** with `instanceId: 2`, it would not have any effect. It would create a third queue, `trades.trades_group-2`, but none would be writing to it.
+
+However, if we launched **Trade Requestor** with `partitionCount: 3` either while the other **Trade Requestor** with `partitionCount: 2` is running or not, it has a pretty bad effect.
+Before we launched it,
+  - `trades.trades_group-0` queue has a trade for `accountId: 2`
+  - and `trades.trade_group-1` has a trade for `accountId: 3`
+
+However, once the new **Trade Requestor** with `partitionCount: 3` starts, it will be using a different account to partition allocation.
+  - `accountId: 2` would be allocated to partition `2` not `0`
+  - and `accountId: 3` would be allocated to partition `0` not `1`
+If **Trade Requestor** sent trades for both accounts, it would result in trades for `accountId: 2` in two queues.
+
 
 # Resiliency
 
