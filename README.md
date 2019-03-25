@@ -322,7 +322,8 @@ If we are using [Cloud Foundry auto-scaling](https://docs.run.pivotal.io/appsman
 
 These is what it takes to deploy the **Trade Executor** application in Cloud Foundry:
   - [Declare the number of partitions](trade-executor/manifest.yml#L5) in the manifest.yml that we will use to push the application to Cloud Foundry.
-  - [Set the `instanceIndex` so that it round-robins CF_INSTANCE_INDEX around the number of partitions](trade-executor/.profile) in the .profile file that we will be sent when we push the application to Cloud Foundry
+  - [Set the `instanceIndex` so that it round-robins CF_INSTANCE_INDEX around the number of partitions](trade-executor/.profile) in the .profile file that we will be sent when we push the application to Cloud Foundry.  
+  Notice that we are setting the `instanceIndex` over the `trades` binding and not the more general `spring.cloud.stream.instanceIndex`. The former is preferred over the latter because it is more specific and allows us to have multiple partitioned queues with different `instanceIndex` and `partitionCount`.
 
 There is another [manifest.yml](trade-requestor/manifest.yml) but it is not really important except that it allows us to override the number of partitions defined in the [application.yml](trade-requestor/src/main/resources/application.yml).
 
