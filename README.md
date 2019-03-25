@@ -23,27 +23,33 @@
 
 The goal is to explore how to use [Spring Cloud Stream](https://docs.spring.io/spring-cloud-stream/) to partition messages in RabbitMQ.
 
-To explore the capabilities of Spring Cloud Stream, we have created 2 sample Spring Boot applications: a **Trade Requestor** which sends *trade request* messages. Each *trade request* message contains the account who requested the trade *request*. A second application is **Trade Executor** which receives *trade request* messages and simulate their execution by printing them to the standard output.
+To explore the capabilities of Spring Cloud Stream, we have created 2 sample Spring Boot applications: a **Trade Requestor** which sends *trade request* messages. Each *trade request* message contains the account who requested the trade *request*. **Trade Executor** is the second application which receives *trade request* messages and simulate their execution by printing them to the standard output.
 
-The diagram below shows two applications talking over a single queue. There are no data partition here.
+### Scenario without data partition
+
+The diagram below shows two applications talking over a single queue. There is no data partition here yet.
 
 ![Before introducing partitioning](assets/before_partition.png)
 
-We may have many **Trade Requestor** instances (**M**) sending *trade request* messages to a **Trades** queue. And we may have also one or many **Trade Executor** instances, depending on our requirements, reading from the same **Trades** queue. Check out section [Why do we do need to partition the data?](#why-do-we-need-to-use-spring-cloud-stream) for more details.
+We may have many **Trade Requestor** instances (**M**) sending *trade request* messages to a **Trades** queue. And we may have one or many **Trade Executor** instances, depending on our requirements, reading from the same **Trades** queue. Check out section [Why do we do need to partition the data?](#why-do-we-need-to-use-spring-cloud-stream) for more details.
+> We may have zero **Trade Executor** instances (`0`) reading from the **Trades** queue. And we may have up to 1 instance if we want to process messages in strict order or many if we are not concerned with ordering. We will discuss this shortly in more depth.
 
-What happens if we have to process all the *trade request* in order (e.g. FIFO)? We cannot have more than one **Trade Executor** instance, hence the question mark in the diagram resolves to **1**.
+What happens if we have to process *trade request*(s) in order (e.g. FIFO)? In that case, we cannot have more than one **Trade Executor** instance, hence the question mark in the diagram resolves to **1**.
 
-The diagram below shows the same two applications but this time we have partitioned the messages based on some criteria that we will see shortly. Rather than one we have as many **Trades** queues as partitions (denoted by the letter **N**) we want to have. Given a trade message, the **Trade Requestor** (done by Spring Cloud Stream) determines the partition it should go to and sends the message to the corresponding **Trades** queue.
-**TL;DR** This topology requires, at least, one **Trade Executor** instance per partition.
+### Scenario with data partition
+
+The diagram below shows the same two applications but this time we have partitioned the messages based on some criteria that we will see shortly. Rather than one we have as many **Trades** queues as partitions (denoted by the letter **N**) we want to have. Given a trade message, the **Trade Requestor** determines the partition it should go to and sends the message to the corresponding **Trades** queue.
+
+**TL;DR**: This topology requires, at least, one **Trade Executor** instance per partition.
 
 ![After introducing partitioning](assets/after_partition.png)
 
-And this is briefly what happens when the **Trade Requestor** sends a *trade request* for account id `5` given that we have selected 2 partitions.
+And this is briefly what happens when the **Trade Requestor** sends a *trade request* for account id `5` given that we have chosen at most `2` partitions.
 
 ![Data partition](assets/partioning.png)
 
-- **Trade Requestor** invokes a function `K(message)` (known as `PartitionKeyExtractorStrategy` in [Spring Cloud Stream](https://docs.spring.io/spring-cloud-stream/docs/current/reference/htmlsingle/#partitioning)) on the message to determine which value it should used to partition the message. In our sample, we used the *account id*, whose value is `5`
-- **Trade Requestor** then invokes another function `f(5)` (known as `PartitionSelectorStrategy` in [Spring Cloud Stream](https://docs.spring.io/spring-cloud-stream/docs/current/reference/htmlsingle/#partitioning)) on the value returned from the previous function which determines the partition where the message should go to. We have implemented our [own function](trade-requestor/src/main/java/com/pivotal/partitioning/TradeRequestorApplication.java#L44-L47) which takes the *account id* and calculates the modulus against the *partition count*.
+- **Trade Requestor** invokes a function `K(message)` (known as `PartitionKeyExtractorStrategy` in [Spring Cloud Stream](https://docs.spring.io/spring-cloud-stream/docs/current/reference/htmlsingle/#partitioning)) on the message to determine which value it should use to partition the message. In our sample, we used the *account id*, whose value is `5`
+- **Trade Requestor** then invokes another function `f(5)` (known as `PartitionSelectorStrategy` in [Spring Cloud Stream](https://docs.spring.io/spring-cloud-stream/docs/current/reference/htmlsingle/#partitioning)) on the value returned from the previous function which determines the partition where the message should go to. We have implemented our [own function](trade-requestor/src/main/java/com/pivotal/partitioning/TradeRequestorApplication.java#L44-L47) which takes the *account id* and calculates the modulus against the *partition count*. Which produces the partition `1`
 - **Trade Requestor** sends the *trade request* to **Trades #1** queue.
 
 
