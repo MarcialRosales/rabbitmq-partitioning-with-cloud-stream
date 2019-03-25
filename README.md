@@ -318,11 +318,10 @@ We can run as many instances of the **trade executor** application as needed pro
 However, when we deploy the application to Cloud Foundry,
 Spring Cloud Stream uses the  [CF_INSTANCE_INDEX](https://docs.cloudfoundry.org/devguide/deploy-apps/environment-variable.html#CF-INSTANCE-INDEX) environment variable to [configure](https://github.com/spring-cloud/spring-cloud-stream/blob/master/spring-cloud-stream/src/main/java/org/springframework/cloud/stream/config/BindingServiceProperties.java#L66) `spring.cloud.stream.instanceIndex` property if we have not set it yet.
 
+To test this behaviour, run `trade-executor/run.sh 2` command to launch an instance of **Trade Executor** with `CF_INSTANCE_INDEX = 2`. You will see in the management ui that there is a 3rd queue called `trades.trades_group-2`.
+
 If we are using [Cloud Foundry auto-scaling](https://docs.run.pivotal.io/appsman-services/autoscaler/using-autoscaler.html) feature, we have to set/override it. Likewise if we are not able to control the deployed number of instances.
 
-### Adding more unique consumers
-
-If we launched a **trade executor** with a instance id of `2` where there are only 2 partitions, that instance will be reading from a partition queue (`trades.trades_group-2`) which will never get any messages.
 
 ### Changing partition count and/or partition selection strategy
 
@@ -347,6 +346,12 @@ However, once the new **Trade Requestor** with `partitionCount: 3` starts, it wi
   - `accountId: 2` would be allocated to partition `2` not `0`
   - and `accountId: 3` would be allocated to partition `0` not `1`
 If **Trade Requestor** sent trades for both accounts, it would result in trades for `accountId: 2` in two queues.
+
+
+What options do we have to change the number of partitions?
+At a very high level we can see two strategies:
+- One that attempts to use the existing queues. It would be highly recommended to [Consistent Hashing](https://en.wikipedia.org/wiki/Consistent_hashing) algorithm as the partition selection strategy rather than the plain modulus operand. This will significantly reduce the amounts of mapping/reallocation of messages to the new partition. This strategy would require to pause the producer and consumer applications until we have completed the re-partition. 
+- and another which creates a new set of queues according to the new partition strategy. Similar to the blue/green deployment strategy. This means, stopping the current producer applications, launching new set of applications (producers and consumers) that uses the new queues. Wait for the old queues to drain before stopping the old consumers. This will mechanism guarantees an strict ordering of messages.
 
 
 # Resiliency
