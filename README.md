@@ -21,7 +21,31 @@
 
 ## Goal of this guide
 
-The goal is to explore what it takes to use [Spring Cloud Stream](https://docs.spring.io/spring-cloud-stream/) to partition messages in RabbitMQ. To do we have created 2 sample Spring Boot applications and a few simple steps on how to run them to see data partitioning in action.
+The goal is to explore how to use [Spring Cloud Stream](https://docs.spring.io/spring-cloud-stream/) to partition messages in RabbitMQ.
+
+To explore the capabilities of Spring Cloud Stream, we have created 2 sample Spring Boot applications: a **Trade Requestor** which sends *trade request* messages. Each *trade request* message contains the account who requested the trade *request*. A second application is **Trade Executor** which receives *trade request* messages and simulate their execution by printing them to the standard output.
+
+The diagram below shows two applications talking over a single queue. There are no data partition here.
+
+![Before introducing partitioning](assets/before_partition.png)
+
+We may have many **Trade Requestor** instances (**M**) sending *trade request* messages to a **Trades** queue. And we may have also one or many **Trade Executor** instances, depending on our requirements, reading from the same **Trades** queue. Check out section [Why do we do need to partition the data?](#why-do-we-need-to-use-spring-cloud-stream) for more details.
+
+What happens if we have to process all the *trade request* in order (e.g. FIFO)? We cannot have more than one **Trade Executor** instance, hence the question mark in the diagram resolves to **1**.
+
+The diagram below shows the same two applications but this time we have partitioned the messages based on some criteria that we will see shortly. Rather than one we have as many **Trades** queues as partitions (denoted by the letter **N**) we want to have. Given a trade message, the **Trade Requestor** (done by Spring Cloud Stream) determines the partition it should go to and sends the message to the corresponding **Trades** queue.
+**TL;DR** This topology requires, at least, one **Trade Executor** instance per partition.
+
+![After introducing partitioning](assets/after_partition.png)
+
+And this is briefly what happens when the **Trade Requestor** sends a *trade request* for account id `5` given that we have selected 2 partitions.
+
+![Data partition](assets/partioning.png)
+
+- **Trade Requestor** invokes a function `K(message)` (known as `PartitionKeyExtractorStrategy` in [Spring Cloud Stream](https://docs.spring.io/spring-cloud-stream/docs/current/reference/htmlsingle/#partitioning)) on the message to determine which value it should used to partition the message. In our sample, we used the *account id*, whose value is `5`
+- **Trade Requestor** then invokes another function `f(5)` (known as `PartitionSelectorStrategy` in [Spring Cloud Stream](https://docs.spring.io/spring-cloud-stream/docs/current/reference/htmlsingle/#partitioning)) on the value returned from the previous function which determines the partition where the message should go to. We have implemented our [own function](trade-requestor/src/main/java/com/pivotal/partitioning/TradeRequestorApplication.java#L44-L47) which takes the *account id* and calculates the modulus against the *partition count*.
+- **Trade Requestor** sends the *trade request* to **Trades #1** queue.
+
 
 ## Why do we do need to partition the data?
 
@@ -50,16 +74,11 @@ git clone https://github.com/MarcialRosales/rabbitmq-partitioning-with-cloud-str
 cd rabbitmq-partitioning-with-cloud-stream
 ```
 
-Under the root folder we have two Spring Boot applications:
+Under the root folder we have the two Spring Boot applications:
 - [Trade Requestor](trade-requestor) which will be responsible for sending *trade requests* on behalf of accounts -identified by a number which we randomly generate.
 - [Trade Executor](trade-executor) which will be responsible for receiving those *trade requests* and simulate that it executes them by simply logging them to the standard output.
 
 We want to partition the trades based on the account the trade is for. We want 2 partitions in total, hence the trades will be spread between these two partitions. This means that we will need at least 2 **trade executor** instances, one for each partition. We can have as many instances of **trade requestor** as we want.
-```
-    [               ]-------->[ partition 1]----->[trade executor #0]
-    [trade requestor]
-    [               ]-------->[ partition 2]----->[trade executor #1]
-```
 
 To run the trade requestor, we recommend launching a terminal and run this command from it:
 ```bash
