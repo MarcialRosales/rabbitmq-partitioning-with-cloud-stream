@@ -357,10 +357,9 @@ If **Trade Requestor** sent trades for both accounts, it would result in trades 
 What options do we have to change the number of partitions?
 At a very high level we can see two strategies:
   - One that attempts to **use the existing queues**.   
-  It would be highly recommended to [Consistent Hashing](https://en.wikipedia.org/wiki/Consistent_hashing) algorithm as the partition selection strategy rather than the plain modulus operand. This will significantly reduce the amounts of mapping/reallocation of messages to the new partition. This strategy would require to pause the producer and consumer applications until we have completed the re-partition.
+  It would be highly recommended to [Consistent Hashing](https://en.wikipedia.org/wiki/Consistent_hashing) algorithm as the partition selection strategy rather than the plain modulus operand. This will significantly reduce the amounts of mapping/reallocation of messages to the new partition. This strategy would require to pause the producer and consumer applications until we have completed the re-partitioned the queues.
   - and another which **creates a new set of queues** according to the new partition strategy.  
-  Similar to the blue/green deployment strategy. This means, stopping the current producer applications, launching new set of applications (producers and consumers) that uses the new queues. Wait for the old queues to drain before stopping the old consumers. This will mechanism guarantees an strict ordering of messages.
-
+  This strategy requires launching a new set of application instances that work from the new set of queues.  Depending whether we need strict ordering of messages, the application may require some downtime or not. If we need strict ordering, we need to pause the old producers and wait until all messages have been consumed before starting the new producers. 
 
 # Resiliency
 
