@@ -86,12 +86,15 @@ Under the root folder we have the two Spring Boot applications:
 
 We want to partition the trades based on the account the trade is for. We want 2 partitions in total, hence the trades will be spread between these two partitions. This means that we will need at least 2 **trade executor** instances, one for each partition. We can have as many instances of **trade requestor** as we want.
 
+## Running sample code
+
 To run the trade requestor, we recommend launching a terminal and run this command from it:
 ```bash
 cd trade-requestor
 mvn install
 java -jar target/trade-requestor-0.0.1-SNAPSHOT.jar
 ```
+> We could run as many instances as we want
 
 To run the trade executor instance 0, we recommend launching a separate terminal and run this command from it:
 ```bash
@@ -105,6 +108,9 @@ To run the trade executor instance 1, we recommend launching a separate terminal
 cd trade-executor
 java -jar target/trade-executor-0.0.1-SNAPSHOT.jar --spring.cloud.stream.instanceIndex=1
 ```
+
+This topology guarantees ordered processing of messages because we only have one **Trade Executor** instance per partition. We can have more instances provided that their `spring.cloud.stream.instanceIndex` is between `0` and `1` (i.e. partitionCount = 2).
+
 
 ## Brief introduction to Spring Cloud Stream
 
