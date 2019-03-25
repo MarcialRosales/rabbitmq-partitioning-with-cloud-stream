@@ -7,15 +7,16 @@ management:
 spring:
   cloud:
     stream:
-      instance-count: 2   # there are 2 instances -> there are 2 partitions
 
       bindings:
         trades:  # com.pivotal.partitioning.TRADES
           destination: trades
           binder: local_rabbit
           group: trades_group
+
           consumer:
             partitioned: true
+
 
       binders:
         local_rabbit:

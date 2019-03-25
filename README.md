@@ -309,7 +309,7 @@ If we need to have strict ordering of processing of messages we need to use `exc
 
 ### Message delivery
 
-By default, Spring Cloud Stream will use client acknowledgement (`acknowledgeMode: AUTO`). It will reject messages if the application failed to process and it will not requeue them. We can change this behaviour though with `requeueRejected: true`. But be careful changing this value because it could produce a storm of poisonous messages.
+By default, Spring Cloud Stream will use client acknowledgement (`acknowledgeMode: AUTO`). It will reject messages if the application failed to process and it will not requeue them. We can change this behaviour though with `requeueRejected: true`. But be careful changing this value because it could produce a storm of poisonous messages unless the application raises an `AmqpRejectAndDontRequeueException`.
 
 ## Scaling consumers
 
@@ -318,9 +318,13 @@ We can run as many instances of the **trade executor** application as needed pro
 However, when we deploy the application to Cloud Foundry,
 Spring Cloud Stream uses the  [CF_INSTANCE_INDEX](https://docs.cloudfoundry.org/devguide/deploy-apps/environment-variable.html#CF-INSTANCE-INDEX) environment variable to [configure](https://github.com/spring-cloud/spring-cloud-stream/blob/master/spring-cloud-stream/src/main/java/org/springframework/cloud/stream/config/BindingServiceProperties.java#L66) `spring.cloud.stream.instanceIndex` property if we have not set it yet.
 
-To test this behaviour, run `trade-executor/run.sh 2` command to launch an instance of **Trade Executor** with `CF_INSTANCE_INDEX = 2`. You will see in the management ui that there is a 3rd queue called `trades.trades_group-2`.
+If we are using [Cloud Foundry auto-scaling](https://docs.run.pivotal.io/appsman-services/autoscaler/using-autoscaler.html) feature, we have to set/override by round-robin the instances among the partitions. This means instance 0 will go to partition 0, instance 1 to partition 1, but instance 2 will go to partition 0, and so forth.
 
-If we are using [Cloud Foundry auto-scaling](https://docs.run.pivotal.io/appsman-services/autoscaler/using-autoscaler.html) feature, we have to set/override it. Likewise if we are not able to control the deployed number of instances.
+These is what it takes to deploy the **Trade Executor** application in Cloud Foundry:
+  - [Declare the number of partitions](trade-executor/manifest.yml#L5) in the manifest.yml that we will use to push the application to Cloud Foundry.
+  - [Set the `instanceIndex` so that it round-robins CF_INSTANCE_INDEX around the number of partitions](trade-executor/.profile) in the .profile file that we will be sent when we push the application to Cloud Foundry
+
+There is another [manifest.yml](trade-requestor/manifest.yml) but it is not really important except that it allows us to override the number of partitions defined in the [application.yml](trade-requestor/src/main/resources/application.yml).
 
 
 ### Changing partition count and/or partition selection strategy
@@ -350,8 +354,10 @@ If **Trade Requestor** sent trades for both accounts, it would result in trades 
 
 What options do we have to change the number of partitions?
 At a very high level we can see two strategies:
-- One that attempts to use the existing queues. It would be highly recommended to [Consistent Hashing](https://en.wikipedia.org/wiki/Consistent_hashing) algorithm as the partition selection strategy rather than the plain modulus operand. This will significantly reduce the amounts of mapping/reallocation of messages to the new partition. This strategy would require to pause the producer and consumer applications until we have completed the re-partition. 
-- and another which creates a new set of queues according to the new partition strategy. Similar to the blue/green deployment strategy. This means, stopping the current producer applications, launching new set of applications (producers and consumers) that uses the new queues. Wait for the old queues to drain before stopping the old consumers. This will mechanism guarantees an strict ordering of messages.
+  - One that attempts to **use the existing queues**.   
+  It would be highly recommended to [Consistent Hashing](https://en.wikipedia.org/wiki/Consistent_hashing) algorithm as the partition selection strategy rather than the plain modulus operand. This will significantly reduce the amounts of mapping/reallocation of messages to the new partition. This strategy would require to pause the producer and consumer applications until we have completed the re-partition.
+  - and another which **creates a new set of queues** according to the new partition strategy.  
+  Similar to the blue/green deployment strategy. This means, stopping the current producer applications, launching new set of applications (producers and consumers) that uses the new queues. Wait for the old queues to drain before stopping the old consumers. This will mechanism guarantees an strict ordering of messages.
 
 
 # Resiliency

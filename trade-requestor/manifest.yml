@@ -1,0 +1,5 @@
+applications:
+- name: trade-requestor
+  path: target/trade-requestor-0.0.1-SNAPSHOT.jar
+  env:
+    SPRING_CLOUD_STREAM_BINDINGS_TRADESEMITTER_PRODUCER_PARTITIONCOUNT: 2
