@@ -127,7 +127,7 @@ cd trade-executor
 ## Brief introduction to Spring Cloud Stream
 
 Stream Cloud Stream is based on the core concept of a *Channel*. A channel, or *pipe*, can be either an input or an output channel. Input channels are used to receive messages and output channels to send them. That's it.
-![Spring Cloud Stream Application](https://docs.spring.io/spring-cloud-stream/docs/current/reference/htmlsingle/images/SCSt-with-binder.png)
+![Spring Cloud Stream Application](https://raw.githubusercontent.com/spring-cloud/spring-cloud-stream/master/docs/src/main/asciidoc/images/SCSt-with-binder.png)
 
 The application is responsible for declaring what channels it needs and to provide them to the corresponding business component that needs them.
 
